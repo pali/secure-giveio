@@ -1,0 +1,77 @@
+==== Secure GiveIO NT kernel driver ====
+
+This is native Windows NT kernel driver giveio.sys which implements GiveIO API
+by Dale Roberts, "Direct Port I/O and Windows NT", Dr. Dobb's Journal, May 1996.
+
+This Secure GiveIO implementation differs from the original implementation
+slightly but API is exactly same and therefore this new implementation can be
+used as a direct replacement for the original one.
+
+Differences in this Secure GiveIO implementation:
+
+* This implementation is _secure_. It gives direct port I/O access only to
+  privileged processes or threads. Calling thread needs have SeTcbPrivilege
+  (Act as part of the operating system privilege), like NT system call
+  NtSetInformationProcess(ProcessUserModeIOPL) in older NT kernels. Unprivileged
+  processes without SeTcbPrivilege in their access token will not gain direct
+  port I/O access and therefore usage of this kernel driver does not decrease
+  system security for ordinary or guest users. Original implementation gave
+  access to any user process, including unprivileged and so decreased system
+  security.
+
+* This implementation gives direct port I/O access just for the calling thread.
+  Original implementation gave access to all threads from calling process.
+  Reason for this change is simplification of the driver implementation.
+
+* This implementation changes for the calling thread x86 I/O Privilege Level.
+  Original implementation did not change I/O Privilege Level and instead changed
+  bitmap of the x86 Task State Segment for the current process to allow access
+  to the all I/O ports. Changing I/O bitmap in Task State Segment is more
+  complicated and makes more sense only when giving access to just some of I/O
+  ports. Moreover it is not possible in AMD64 NT kernels.
+
+* This implementation works on both IX86 and AMD64 NT systems. Original is
+  IX86-only.
+
+* This implementation can be compiled by MSVC and also by GCC/MinGW.
+  For GCC/MinGW there is separate GNUmakefile with build instructions.
+
+* This implementation has free and open source license.
+
+Copyright, author and license: (c) 2022 Pali Rohár <pali@kernel.org>, GPLv2+
+
+== Compilation with MSVC ==
+
+Ensure that nmake.exe, cl.exe and link.exe are in PATH. And that Windows DDK is
+installed and _BUILDARCH, SDK_INC_PATH, CRT_INC_PATH, DDK_INC_PATH and
+DDK_LIB_PATH env variables are correctly set.
+
+Compilation from DDK console is simple, just call:
+
+  nmake
+
+Outside of the DDK console choose correct values for target architecture, e.g.:
+
+  nmake _BUILDARCH=x86 SDK_INC_PATH=..\inc\api CRT_INC_PATH=..\inc\crt DDK_INC_PATH=..\inc\ddk DDK_LIB_PATH=..\lib\i386
+
+  nmake _BUILDARCH=AMD64 SDK_INC_PATH=..\inc\api CRT_INC_PATH=..\inc\crt DDK_INC_PATH=..\inc\ddk DDK_LIB_PATH=..\lib\amd64
+
+== Compilation with GCC ==
+
+Ensure that MinGW or MinGW-w64 is installed and correct GCC is set in CC env
+variable. Also ensure that build system has installed Perl interpreter and is in
+PATH. Perl interpreter is needed for post fixup script to workaround GCC bugs.
+
+When default system compiler is the correct one then just call:
+
+  make
+
+When cross compiling or default system compiler is not the correct one then call
+make with correct compiler for chosen target architecture, e.g.:
+
+  make CC=i686-w64-mingw32-gcc
+
+  make CC=x86_64-w64-mingw32-gcc
+
+Note that compilation with GCC is experimental due to bugs in GCC and GNU LD
+linker. Workarounds are provided via linker scripts and post fixup script.
